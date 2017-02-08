@@ -8,6 +8,8 @@ import { registerScreens } from './screens';
 import { iconsMap, iconsLoaded } from './utils/AppIcons';
 import configureStore from './store/configureStore';
 
+import Theme from './modules/_global/styles/Theme';
+
 const store = configureStore();
 
 registerScreens(store, Provider);
@@ -51,7 +53,7 @@ class App extends Component {
             tabsStyle: {
                 tabBarButtonColor: 'white',
                 tabBarSelectedButtonColor: 'white',
-                tabBarBackgroundColor: '#3684C1'
+                tabBarBackgroundColor: Theme.brandPrimary
             }
         });
     }

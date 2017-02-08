@@ -120,7 +120,7 @@ class GameList extends Component {
             if (event.id === 'newGame') {
                 this.props.navigator.showModal({
                     screen: 'WerewolfReplayer.GameCreator',
-                    title: '创建新游戏'
+                    title: '创建新游戏 1/2'
                 });
             }
         }

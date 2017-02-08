@@ -2,9 +2,12 @@
 
 import React, { Component } from 'react';
 
+import update from 'immutability-helper';
+
 import {
     StyleSheet,
     View,
+    Text
 } from 'react-native';
 
 import {
@@ -14,42 +17,63 @@ import {
     ListItem,
     Button,
     Input,
-    InputGroup,
-    Icon
+    Icon,
+    CheckBox
 } from 'native-base';
 
 import Theme from '../../_global/styles/Theme';
 import {
     ROLE_SIMPLE_VILLAGER,
+    ROLE_WEREWOLF,
     ROLES_MAP
 } from '../../../constants/roleTypes';
 
 class RoleItem extends Component {
     constructor(props) {
         super(props);
-        this.state = {
-            num: this.props.num
-        };
     }
 
     render() {
+        let {roleType, callbacks} = this.props;
+        let {icon, name, single} = ROLES_MAP[roleType];
+        let iconName = `ios-${icon}-outline`;
+        let buttons;
+        if (single) {
+            buttons = (
+                <View style={styles.roleItemButtonsSingle}>
+                    <Button danger onPress={callbacks.delete.bind(null, roleType)}>
+                        <Icon name='ios-close-circle' />
+                    </Button>
+                </View>
+            );
+        }
+        else {
+            buttons = (
+                <View style={styles.roleItemButtons}>
+                    <Button onPress={callbacks.add.bind(null, roleType)}>
+                        <Icon name='ios-add-circle' />
+                    </Button>
+                    <Button onPress={callbacks.remove.bind(null, roleType)}>
+                        <Icon name='ios-remove-circle' />
+                    </Button>
+                    <Button danger onPress={callbacks.delete.bind(null, roleType)}>
+                        <Icon name='ios-close-circle' />
+                    </Button>
+                </View>
+            );
+        }
         return (
             <ListItem>
-                <View style={{flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center'}}>
-                    <Icon name="ios-mail-outline" style={{ color: '#0A69FE' }} />
-                    <Input placeholder="人数" keyboardType="numeric" value={this.state.num}
-                        onChangeText={(num) => this.setState({num})}/>
-                    <View style={{width: 120, flexDirection: 'row', justifyContent: 'space-between'}}>
-                        <Button onPress={this.props.addRoleItemNum}>
-                            <Icon name='ios-add-circle' />
-                        </Button>
-                        <Button onPress={this.props.removeRoleItemNum}>
-                            <Icon name='ios-remove-circle' />
-                        </Button>
-                        <Button danger onPress={this.props.deleteRoleItem}>
-                            <Icon name='ios-close-circle' />
-                        </Button>
-                    </View>
+                <View style={styles.roleItem}>
+                    <Icon name={iconName} style={styles.roleItemIcon} />
+                    <Text style={{width: 80}}>{name}</Text>
+                    <Icon name='ios-close' style={styles.roleItemTimes} />
+                    <Input style={{flex: 1}} placeholder="人数" keyboardType="numeric"
+                        editable={!single}
+                        defaultValue={this.props.num.toString()}
+                        onChangeText={(text) => callbacks.set.call(null, roleType, text)}
+                    />
+                    {buttons}
                 </View>
             </ListItem>
         );
@@ -66,18 +90,36 @@ class GameCreator extends Component {
         ],
         rightButtons: [
             {
-                title: '保存',
-                id: 'save'
+                title: '下一步',
+                id: 'next'
             }
         ]
     };
 
     constructor(props) {
         super(props);
-        this.state = {
-            roles: {}
-        };
+        
+        this.initRoles();
+        this._onAddRoleItemNum = this._onAddRoleItemNum.bind(this);
+        this._onRemoveRoleItemNum = this._onRemoveRoleItemNum.bind(this);
+        this._onDeleteRoleItem = this._onDeleteRoleItem.bind(this);
+        this._onSetRoleItemNum = this._onSetRoleItemNum.bind(this);
+        
         this.props.navigator.setOnNavigatorEvent(this.onNavigatorEvent.bind(this));
+    }
+
+    initRoles() {
+        let roles = {
+            total: 5
+        };
+        Object.keys(ROLES_MAP).forEach(roleType => {
+            roles[roleType] = {
+                num: 1
+            }
+        });
+        this.state = {
+            roles
+        };
     }
 
     onNavigatorEvent(event) {
@@ -85,55 +127,144 @@ class GameCreator extends Component {
             if (event.id == 'close') {
                 this.props.navigator.dismissModal();
             }
-            if (event.id == 'save') {
-                this.props.navigator.dismissModal();
+            if (event.id == 'next') {
+                this.props.navigator.showModal({
+                    screen: 'WerewolfReplayer.GameCreatorStep2',
+                    title: '创建新游戏 2/2',
+                    passProps: {
+                        roles: this.state.roles
+                    }
+                });
             }
         }
     }
 
-    _onAddRoleItemNum(roleType = ROLE_SIMPLE_VILLAGER) {
-        if (!this.state.roles[roleType]) {
-            this.setState({
-                roles: {
-                    [roleType]: {
-                        num: 1
+    _onSetRoleItemNum(roleType, numToSet) {
+        numToSet = Number(numToSet);
+        let {total = 0} = this.state.roles;
+        let {num = 0} = this.state.roles[roleType] || {};
+        this.setState(update(this.state, {
+            roles: {
+                [roleType]: {
+                    num: {
+                        $set: numToSet
                     }
+                },
+                total: {
+                    $set: total - num + numToSet
                 }
-            });
+            }
+        }));
+    }
+
+    _onAddRoleItemNum(roleType) {
+        let {total = 0} = this.state.roles;
+        let {num = 0} = this.state.roles[roleType] || {};
+        this.setState(update(this.state, {
+            roles: {
+                [roleType]: {
+                    num: {
+                        $set: ++num
+                    }
+                },
+                total: {
+                    $set: ++total
+                }
+            }
+        }));
+    }
+
+    _onRemoveRoleItemNum(roleType) {
+        let {total} = this.state.roles;
+        let {num} = this.state.roles[roleType];
+        if (num === 1) {
+            return;
+        }
+        this.setState(update(this.state, {
+            roles: {
+                [roleType]: {
+                    num: {
+                        $set: --num
+                    }
+                },
+                total: {
+                    $set: --total
+                }
+            }
+        }));
+    }
+
+    _onDeleteRoleItem(roleType) {
+        let {total} = this.state.roles;
+        let {num} = this.state.roles[roleType];
+        this.setState(update(this.state, {
+            roles: {
+                [roleType]: {
+                    num: {
+                        $set: 0
+                    }
+                },
+                total: {
+                    $set: total - num
+                }
+            }
+        }));
+    }
+
+    _onToggleRole(roleType, toggle) {
+        if (toggle) {
+            this._onDeleteRoleItem(roleType);
         }
         else {
-            let {num} = this.state.roles[roleType];
-            this.setState({
-                roles: {
-                    [roleType]: {
-                        num: num++
-                    }
-                }
-            });
+            this._onAddRoleItemNum(roleType);
         }
-    }
-
-    _onRemoveRoleItemNum(roleType = ROLE_SIMPLE_VILLAGER) {
-        
-    }
-
-    _onDeleteRoleItem(roleType = ROLE_SIMPLE_VILLAGER) {
-
     }
 
     render() {
-        const roleType = ROLE_SIMPLE_VILLAGER;
+        let {total} = this.state.roles;
+        let roleItems = Object.keys(ROLES_MAP).map((roleType, roleTypeIdx) => {
+            let role = this.state.roles[roleType];
+            return (role && role.num > 0 &&
+                <RoleItem
+                    key={roleTypeIdx}
+                    roleType={roleType}
+                    num={role.num}
+                    callbacks={{
+                        add: this._onAddRoleItemNum,
+                        remove: this._onRemoveRoleItemNum,
+                        delete: this._onDeleteRoleItem,
+                        set: this._onSetRoleItemNum
+                    }}
+                />
+            );
+        });
+
+        let roleCheckbox = Object.keys(ROLES_MAP).map((roleType, roleTypeIdx) => {
+            let role = this.state.roles[roleType];
+            let checked = role && role.num > 0;
+            return (
+                <ListItem key={roleTypeIdx}>
+                    <CheckBox
+                        checked={checked}
+                        onPress={this._onToggleRole.bind(this, roleType, checked)}/>
+                    <Text>{ROLES_MAP[roleType].name}</Text>
+                    <Text style={styles.roleCheckboxDesc}>{ROLES_MAP[roleType].desc}</Text>
+                </ListItem>
+            );
+        });
+
         return (
             <Container>
                 <Content theme={Theme}>
+                    <View style={styles.header}>
+                        <Text style={styles.headerText}>选择板子</Text>
+                        <Text style={styles.headerText}>{total}人局</Text>
+                    </View>
                     <List>
-                        <RoleItem
-                            type={roleType}
-                            num={'0'}
-                            addRoleItemNum={this._onAddRoleItemNum.bind(this, roleType)}
-                            removeRoleItemNum={this._onRemoveRoleItemNum.bind(this, roleType)}
-                            deleteRoleItem={this._onDeleteRoleItem.bind(this, roleType)}
-                        />
+                        {roleCheckbox}
+                    </List>
+                    <List>
+                        {roleItems}
                     </List>
                 </Content>
             </Container>
@@ -142,7 +273,47 @@ class GameCreator extends Component {
 }
 
 const styles = StyleSheet.create({
-
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginLeft: 15,
+        marginRight: 12,
+        paddingTop: 8 
+    },
+    headerText: {
+        fontSize: 18
+    },
+    roleCheckboxDesc: {
+        color: '#999'
+    },
+    roleItem: {
+        flex: 1,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    roleItemIcon: {
+        color: '#0A69FE',
+        width: 30,
+        height: 30,
+        fontSize: 30
+    },
+    roleItemTimes: {
+        color: '#0A69FE',
+        width: 24,
+        height: 24,
+        fontSize: 24
+    },
+    roleItemButtons: {
+        width: 120,
+        flexDirection: 'row',
+        justifyContent: 'space-between'
+    },
+    roleItemButtonsSingle: {
+        width: 36.5,
+        flexDirection: 'row',
+        justifyContent: 'space-between'
+    }
 });
 
 
